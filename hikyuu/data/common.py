@@ -28,7 +28,10 @@ import akshare as ak
 import pandas as pd
 import datetime
 from hikyuu.util import *
-
+from pytdxdata.models import  Market,SecurityQuote
+from pytdxdata import TdxData
+import time 
+import asyncio
 
 class MARKET:
     SH = 'SH'
@@ -142,10 +145,34 @@ def get_index_code_name_list() -> list:
         df = ak.stock_zh_index_spot_em()
     else:
         df = ak.stock_zh_index_spot()
-    res = [{'market_code': df.loc[i]['代码'].upper(), 'name': df.loc[i]['名称']} for i in range(len(df))]
+    res = [{'market_code': df.loc[i]['代码'].upper(), 'name': df.loc[i]['名称'], 'source': 'ak'} for i in range(len(df))]
+
+    tdxindexes = asyncio.run(fetch_tdxdata_index())
+    res.extend(tdxindexes)
+
     ret = [v for v in res if len(v['market_code']) == 8]
+
     return ret
 
+async def fetch_tdxdata_index():
+    result = []
+     # TdxData 为异步上下文管理器：进入时建连，退出时释放
+    async with TdxData() as td:
+        industry_boards =await td.get_boards(kind='industry')
+        time.sleep(1)
+        # 细分业务
+        style_boards =await td.get_boards(kind='style')
+
+        if industry_boards and len(industry_boards) > 0:
+            for board in industry_boards:
+                result.append({'market_code': 'SH' + board.code, 'name': board.name, 'source': 'tdxdata'})
+
+        if style_boards and len(style_boards) > 0:
+            for board in style_boards:
+                result.append({'market_code': 'SH' + board.code, 'name': board.name, 'source': 'tdxdata'})
+    return result
+
+    
 
 g_fund_code_name_list = {}
 for market in g_market_list:
@@ -198,7 +225,23 @@ def get_china_bond10_rate(start_date="19901219"):
     df = bond_zh_us_rate_df[['中国国债收益率10年', '日期']].dropna()
     return [(v[1].strftime('%Y%m%d'), int(v[0]*10000)) for v in df.values]
 
+def modify_tdxdata_code(bk_member: SecurityQuote):
+    if bk_member.symbol:
+        return bk_member.symbol.upper()
+    
+    market = bk_member.market
+    code = bk_member.code
 
+    if int(market) == Market.SH.value:
+        return 'SH' + code
+    if int(market) == Market.SZ.value:
+        return 'SZ' + code
+    if int(market) == Market.BJ.value:
+        return 'BJ' + code
+    else:
+        hku_warn("Unknow code: {}", code)
+        return None
+    
 def modifiy_code(code):
     if code.startswith(('0', '3', '5', '20')):
         return 'SZ' + code
@@ -246,3 +289,4 @@ def historyfinancialreader(filepath):
         results.append((file_date, modifiy_code(code), report_date, info_data))
     cw_file.close()
     return results
+

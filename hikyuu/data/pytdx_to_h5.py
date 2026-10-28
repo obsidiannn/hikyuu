@@ -430,10 +430,11 @@ def import_data(connect, market, ktype, quotations, api, dest_dir, startDate=199
     failed_list = []
     total = len(stock_list)
     for i, stock in enumerate(stock_list):
-        if stock[3] == 0 or len(stock[2]) != 6:
-            if progress:
-                progress(i, total)
-            continue
+        if stock.type != 2:
+            if stock[3] == 0 or len(stock[2]) != 6:
+                if progress:
+                    progress(i, total)
+                continue
 
         this_count, success, lastdate = import_one_stock_data(connect, api, h5file, market, ktype, stock, startDate)
         if not success:
@@ -695,91 +696,107 @@ def import_time(connect, market, quotations, api, dest_dir, max_days=9000, progr
     return add_record_count
 
 
-if __name__ == '__main__':
+# if __name__ == '__main__':
+#     import os
+#     import time
+#     starttime = time.time()
+
+#     dest_dir = "/Users/fasiondog/stock"
+#     tdx_server = '180.101.48.170'
+#     tdx_port = 7709
+#     quotations = ['stock', 'fund']
+
+#     connect = sqlite3.connect(dest_dir + "\\stock.db")
+#     create_database(connect)
+
+#     from pytdx.hq import TdxHq_API, TDXParams
+#     api = TdxHq_API()
+#     api.connect(tdx_server, tdx_port)
+
+#     add_count = 0
+#     """
+#     print("导入指数代码表")
+#     add_count = import_index_name(connect)
+#     print("指数个数：", add_count)
+#     """
+#     # print("导入股票代码表")
+#     # add_count = import_stock_name(connect, api, 'SH', quotations)
+#     # # add_count += import_stock_name(connect, api, 'SZ', quotations)
+#     # print("新增股票数：", add_count)
+
+#     """
+#     print("\n导入上证日线数据")
+#     add_count = import_data(connect, 'SH', 'DAY', quotations, api, dest_dir, progress=ProgressBar)
+#     print("\n导入数量：", add_count)
+
+#     print("\n导入深证日线数据")
+#     add_count = import_data(connect, 'SZ', 'DAY', quotations, api, dest_dir, progress=ProgressBar)
+#     print("\n导入数量：", add_count)
+#     """
+
+#     print("\n导入上证5分钟线数据")
+#     add_count = import_data(connect, 'SH', 'DAY', quotations, api, dest_dir, progress=ProgressBar)
+#     print("\n导入数量：", add_count)
+
+#     """
+#     print("\n导入深证5分钟线数据")
+#     add_count = import_data(connect, 'SZ', '5MIN', quotations, api, dest_dir, progress=ProgressBar)
+#     print("\n导入数量：", add_count)
+
+#     print("\n导入上证分钟线数据")
+#     add_count = import_data(connect, 'SH', '1MIN', quotations, api, dest_dir, progress=ProgressBar)
+#     print("\n导入数量：", add_count)
+
+#     print("\n导入深证分钟线数据")
+#     add_count = import_data(connect, 'SZ', '1MIN', quotations, api, dest_dir, progress=ProgressBar)
+#     print("\n导入数量：", add_count)
+
+#     print("\n导入权息数据")
+#     print("正在下载权息数据...")
+#     import urllib.request
+#     net_file = urllib.request.urlopen('http://www.qianlong.com.cn/download/history/weight.rar', timeout=60)
+#     dest_filename = dest_dir + '/weight.rar'
+#     with open(dest_filename, 'wb') as file:
+#         file.write(net_file.read())
+
+#     print("下载完成，正在解压...")
+#     os.system('unrar x -o+ -inul {} {}'.format(dest_filename, dest_dir))
+
+#     print("解压完成，正在导入...")
+#     add_count = qianlong_import_weight(connect, dest_dir + '/weight', 'SH')
+#     add_count += qianlong_import_weight(connect, dest_dir + '/weight', 'SZ')
+#     print("导入数量：", add_count)
+
+#     print("\n导入上证分笔数据")
+#     #add_count = import_trans(connect, 'SH', quotations, api, dest_dir, max_days=2, progress=ProgressBar)
+#     print("\n导入数量：", add_count)
+
+
+#     print("\n导入上证分时数据")
+#     add_count = import_time(connect, 'SZ', quotations, api, dest_dir, max_days=3, progress=ProgressBar)
+#     print("\n导入数量：", add_count)
+#     """
+
+#     api.disconnect()
+#     connect.close()
+
+#     endtime = time.time()
+#     print("\nTotal time:")
+#     print("%.2fs" % (endtime - starttime))
+#     print("%.2fm" % ((endtime - starttime) / 60))
+
+
+
+if __name__ == "__main__":
     import os
     import time
     starttime = time.time()
 
-    dest_dir = "/Users/fasiondog/stock"
-    tdx_server = '180.101.48.170'
-    tdx_port = 7709
+    dest_dir = "/Users/Zhuanz1/data/hikyuu_stock"
+    connect = sqlite3.connect(dest_dir + "/stock.db")
+    # import_index_name(connect)
     quotations = ['stock', 'fund']
-
-    connect = sqlite3.connect(dest_dir + "\\stock.db")
-    create_database(connect)
 
     from pytdx.hq import TdxHq_API, TDXParams
     api = TdxHq_API()
-    api.connect(tdx_server, tdx_port)
-
-    add_count = 0
-    """
-    print("导入指数代码表")
-    add_count = import_index_name(connect)
-    print("指数个数：", add_count)
-    """
-    # print("导入股票代码表")
-    # add_count = import_stock_name(connect, api, 'SH', quotations)
-    # # add_count += import_stock_name(connect, api, 'SZ', quotations)
-    # print("新增股票数：", add_count)
-
-    """
-    print("\n导入上证日线数据")
     add_count = import_data(connect, 'SH', 'DAY', quotations, api, dest_dir, progress=ProgressBar)
-    print("\n导入数量：", add_count)
-
-    print("\n导入深证日线数据")
-    add_count = import_data(connect, 'SZ', 'DAY', quotations, api, dest_dir, progress=ProgressBar)
-    print("\n导入数量：", add_count)
-    """
-
-    print("\n导入上证5分钟线数据")
-    add_count = import_data(connect, 'SH', 'DAY', quotations, api, dest_dir, progress=ProgressBar)
-    print("\n导入数量：", add_count)
-
-    """
-    print("\n导入深证5分钟线数据")
-    add_count = import_data(connect, 'SZ', '5MIN', quotations, api, dest_dir, progress=ProgressBar)
-    print("\n导入数量：", add_count)
-
-    print("\n导入上证分钟线数据")
-    add_count = import_data(connect, 'SH', '1MIN', quotations, api, dest_dir, progress=ProgressBar)
-    print("\n导入数量：", add_count)
-
-    print("\n导入深证分钟线数据")
-    add_count = import_data(connect, 'SZ', '1MIN', quotations, api, dest_dir, progress=ProgressBar)
-    print("\n导入数量：", add_count)
-
-    print("\n导入权息数据")
-    print("正在下载权息数据...")
-    import urllib.request
-    net_file = urllib.request.urlopen('http://www.qianlong.com.cn/download/history/weight.rar', timeout=60)
-    dest_filename = dest_dir + '/weight.rar'
-    with open(dest_filename, 'wb') as file:
-        file.write(net_file.read())
-
-    print("下载完成，正在解压...")
-    os.system('unrar x -o+ -inul {} {}'.format(dest_filename, dest_dir))
-
-    print("解压完成，正在导入...")
-    add_count = qianlong_import_weight(connect, dest_dir + '/weight', 'SH')
-    add_count += qianlong_import_weight(connect, dest_dir + '/weight', 'SZ')
-    print("导入数量：", add_count)
-
-    print("\n导入上证分笔数据")
-    #add_count = import_trans(connect, 'SH', quotations, api, dest_dir, max_days=2, progress=ProgressBar)
-    print("\n导入数量：", add_count)
-
-
-    print("\n导入上证分时数据")
-    add_count = import_time(connect, 'SZ', quotations, api, dest_dir, max_days=3, progress=ProgressBar)
-    print("\n导入数量：", add_count)
-    """
-
-    api.disconnect()
-    connect.close()
-
-    endtime = time.time()
-    print("\nTotal time:")
-    print("%.2fs" % (endtime - starttime))
-    print("%.2fm" % ((endtime - starttime) / 60))
