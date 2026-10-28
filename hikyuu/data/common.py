@@ -165,11 +165,11 @@ async def fetch_tdxdata_index():
 
         if industry_boards and len(industry_boards) > 0:
             for board in industry_boards:
-                result.append({'market_code': 'SH' + board.code, 'name': board.name, 'source': 'tdxdata'})
+                result.append({'market_code': 'SH' + board.code, 'name': board.name, 'source': 'tdx'})
 
         if style_boards and len(style_boards) > 0:
             for board in style_boards:
-                result.append({'market_code': 'SH' + board.code, 'name': board.name, 'source': 'tdxdata'})
+                result.append({'market_code': 'SH' + board.code, 'name': board.name, 'source': 'tdx'})
     return result
 
     

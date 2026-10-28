@@ -85,8 +85,8 @@ if __name__ == "__main__":
     import sqlite3
 
     # dest_dir = "/home/fasiondog/stock"
-    dest_dir = "/Users/fasiondog/stock"
-    # dest_dir = "/Users/Zhuanz1/data/hikyuu_stock"
+    # dest_dir = "/Users/fasiondog/stock"
+    dest_dir = "/Users/Zhuanz1/data/hikyuu_stock"
 
     connect = sqlite3.connect(dest_dir + "/stock.db")
     # create_database(connect)
