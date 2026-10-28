@@ -22,17 +22,17 @@ async def main() -> None:
         # for key, value in summary.items():
         #     print(f"  {key}: {value}")
         # 其他类型
-        all_boards =await td.get_boards()
-        time.sleep(1)
-        # 其他类型
-        industry_boards =await td.get_boards(kind='industry')
-        time.sleep(1)
-        concept_boards =await td.get_boards(kind='concept',count=10)
-        time.sleep(1)
-        # 细分业务
-        style_boards =await td.get_boards(kind='style')
+        # all_boards =await td.get_boards()
+        # time.sleep(1)
+        # # 其他类型
+        # industry_boards =await td.get_boards(kind='industry')
+        # time.sleep(1)
+        # concept_boards =await td.get_boards(kind='concept',count=10)
+        # time.sleep(1)
+        # # 细分业务
+        # style_boards =await td.get_boards(kind='style')
 
-        board_members = await td.get_board_members('880465')
+        # board_members = await td.get_board_members('880465')
         bars =  await td.get_bars("880471", count=10, start_date=convert2_datetime("20261027"),
                                   end_date=convert2_datetime("20261027"))
         # 成交额 亿
