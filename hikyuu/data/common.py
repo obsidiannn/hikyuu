@@ -65,7 +65,7 @@ class STOCKTYPE:
 
 def get_a_stktype_list():
     """获取A股市场证券类型元组，含B股"""
-    return (STOCKTYPE.A, STOCKTYPE.INDEX, STOCKTYPE.B, STOCKTYPE.GEM, STOCKTYPE.START, STOCKTYPE.A_BJ)
+    return (STOCKTYPE.A, STOCKTYPE.INDEX, STOCKTYPE.B, STOCKTYPE.GEM, STOCKTYPE.START, STOCKTYPE.A_BJ, STOCKTYPE.BLOCK)
 
 
 def get_stktype_list(quotations=None):

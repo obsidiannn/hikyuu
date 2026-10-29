@@ -884,38 +884,39 @@ def import_time(connect, market, quotations, api, dest_dir, max_days=9000, progr
     return add_record_count
 
 
-# if __name__ == '__main__':
+def test_import_data():
 #     import os
 #     import time
-#     starttime = time.time()
+    starttime = time.time()
 
-#     dest_dir = "/Users/fasiondog/stock"
-#     tdx_server = '180.101.48.170'
-#     tdx_port = 7709
-#     quotations = ['stock', 'fund']
+    dest_dir = "/Users/Zhuanz1/data/hikyuu_stock"
+    tdx_server = '180.101.48.170'
+    tdx_port = 7709
+    quotations = ['stock', 'fund']
 
-#     connect = sqlite3.connect(dest_dir + "\\stock.db")
-#     create_database(connect)
+    connect = sqlite3.connect(dest_dir + "/stock.db")
+    # create_database(connect)
 
-#     from pytdx.hq import TdxHq_API, TDXParams
-#     api = TdxHq_API()
-#     api.connect(tdx_server, tdx_port)
+    from pytdx.hq import TdxHq_API, TDXParams
+    api = TdxHq_API()
+    api.connect(tdx_server, tdx_port)
+    add_count = 0
+    add_count = import_data(connect, 'SH', 'DAY', quotations, api, dest_dir, progress=ProgressBar)
+    print(1)
+    """
+    print("导入指数代码表")
+    add_count = import_index_name(connect)
+    print("指数个数：", add_count)
+    """
+    # print("导入股票代码表")
+    # add_count = import_stock_name(connect, api, 'SH', quotations)
+    # # add_count += import_stock_name(connect, api, 'SZ', quotations)
+    # print("新增股票数：", add_count)
 
-#     add_count = 0
-#     """
-#     print("导入指数代码表")
-#     add_count = import_index_name(connect)
-#     print("指数个数：", add_count)
-#     """
-#     # print("导入股票代码表")
-#     # add_count = import_stock_name(connect, api, 'SH', quotations)
-#     # # add_count += import_stock_name(connect, api, 'SZ', quotations)
-#     # print("新增股票数：", add_count)
-
-#     """
-#     print("\n导入上证日线数据")
-#     add_count = import_data(connect, 'SH', 'DAY', quotations, api, dest_dir, progress=ProgressBar)
-#     print("\n导入数量：", add_count)
+    """
+    print("\n导入上证日线数据")
+    add_count = import_data(connect, 'SH', 'DAY', quotations, api, dest_dir, progress=ProgressBar)
+    print("\n导入数量：", add_count)
 
 #     print("\n导入深证日线数据")
 #     add_count = import_data(connect, 'SZ', 'DAY', quotations, api, dest_dir, progress=ProgressBar)
@@ -1015,6 +1016,7 @@ def test_kline_import():
 
 
 if __name__ == "__main__":
-    test_kline_import()
+    # test_kline_import()
     # test_stock_import()
+    test_import_data()
     pass
