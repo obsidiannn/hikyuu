@@ -140,6 +140,7 @@ def import_stock_name(connect, api, market, quotations=None):
     stktype_list = get_stktype_list(quotations)
     stktype_list = list(stktype_list)
     stktype_list.remove(STOCKTYPE.INDEX)  # 移除指数类型
+    stktype_list.remove(STOCKTYPE.BLOCK)  # 移除板块类型
     stktype_list = tuple(stktype_list)
     a = cur.execute(
         "select stockid, code, name, valid from stock where marketid={} and type in {}".format(marketid, stktype_list)
@@ -149,7 +150,6 @@ def import_stock_name(connect, api, market, quotations=None):
     for oldstock in a:
         oldstockid, oldcode, oldname, oldvalid = oldstock[0], oldstock[1], oldstock[2], int(oldstock[3])
         oldStockDict[oldcode] = oldstockid
-
         # 新的代码表中无此股票或者已退市，则置为无效
         if (oldvalid == 1) and ((oldcode not in newStockDict) or (oldcode in deSet)):
             cur.execute("update stock set valid=0 where stockid=%i" % oldstockid)
@@ -567,7 +567,7 @@ async def batch_fetch_tdx_data(connect, stocks: list, ktype, h5file, startDate):
             try:
                 this_count, success, lastdate = await import_tdx_single_block_data(connect, td, h5file, market, ktype, stock, startDate)
                 if this_count > 0:
-                    hku_info(f"板块更新k线:{stock[2]}| {this_count}")
+                    print(f"板块更新k线:{stock[2]}| {this_count}")
                     if ktype == 'DAY':
                         update_hdf5_extern_data(h5file, market.upper() + stock[2], 'DAY')
                     elif ktype == '5MIN':
@@ -616,9 +616,10 @@ def import_data(connect, market, ktype, quotations, api, dest_dir, startDate=199
                 progress(i, total)
             continue
         # 板块类型的 走 PyTdxData 导入
-        if stock[4] == 0 and str(stock[2]).startswith('8'):
-            tdx_block.append(stock)
-            continue
+        if str(stock[2]).startswith('8'):
+            if str(stock[4]) == '0':
+                tdx_block.append(stock)
+                continue
 
         this_count, success, lastdate = import_one_stock_data(connect, api, h5file, market, ktype, stock, startDate)
         if not success:
@@ -636,7 +637,8 @@ def import_data(connect, market, ktype, quotations, api, dest_dir, startDate=199
         if progress:
             progress(i, total)
 
-    if len(tdx_block) > 0:
+    if len(tdx_block) > 0 and market == 'SH':
+        print('同步 tdx 板块k ... ')
         asyncio.run(batch_fetch_tdx_data(connect, tdx_block, ktype, h5file, startDate))
 
     if total > 0 and progress:
@@ -892,7 +894,7 @@ def test_import_data():
     dest_dir = "/Users/Zhuanz1/data/hikyuu_stock"
     tdx_server = '180.101.48.170'
     tdx_port = 7709
-    quotations = ['stock', 'fund']
+    quotations = ['stock']
 
     connect = sqlite3.connect(dest_dir + "/stock.db")
     # create_database(connect)
@@ -1018,5 +1020,10 @@ def test_kline_import():
 if __name__ == "__main__":
     # test_kline_import()
     # test_stock_import()
-    test_import_data()
+    # test_import_data()
+
+    dest_dir = "/Users/Zhuanz1/data/hikyuu_stock"
+    temp_dir = "/Users/Zhuanz1/data/temp_stock"
+    connect = sqlite3.connect(dest_dir + "/stock.db")
+    import_stock_name(connect, None, 'SH', ['stock'])
     pass
