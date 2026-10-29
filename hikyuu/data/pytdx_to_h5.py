@@ -81,8 +81,8 @@ def import_index_name(connect):
         type = STOCKTYPE.INDEX if index['source'] == 'ak' else STOCKTYPE.BLOCK
         if index['market_code'] in oldStockDict:
             cur.execute(
-                "update stock set valid=1, name='%s' where stockid=%i" %
-                (index['name'], oldStockDict[index['market_code']])
+                "update stock set valid=1, name='%s',type=%d where stockid=%i" %
+                (index['name'], type, oldStockDict[index['market_code']])
             )
         else:
             marketid = MARKETID.SH if index['market_code'][:2] == MARKET.SH else MARKETID.SZ
@@ -405,7 +405,7 @@ def import_one_stock_data(connect, api, h5file, market, ktype, stock_record, sta
 
 
 def convert2_datetime(label, format_label="%Y%m%d"):
-    return datetime.strptime(label, format_label)
+    return datetime.datetime.strptime(label, format_label)
 
 
 async def import_tdx_single_block_data(connect, td: TdxData, h5file, market, ktype, stock_record, startDate=199012191500):
@@ -426,19 +426,12 @@ async def import_tdx_single_block_data(connect, td: TdxData, h5file, market, kty
     last_datetime = int(table[-1]['datetime']) if table.nrows > 0 else startDate
 
     today = datetime.date.today()
+    format_label = "%Y%m%d%H%M"
     if ktype == 'DAY':
-        n, step = guess_day_n_step(last_datetime)
-        pytdx_kline_type = TDXParams.KLINE_TYPE_RI_K
         today_datetime = (today.year * 10000 + today.month * 100 + today.day) * 10000
-
     elif ktype == '1MIN':
-        n, step = guess_1min_n_step(last_datetime)
-        pytdx_kline_type = TDXParams.KLINE_TYPE_1MIN
         today_datetime = (today.year * 10000 + today.month * 100 + today.day) * 10000 + 1500
-
     elif ktype == '5MIN':
-        n, step = guess_5min_n_step(last_datetime)
-        pytdx_kline_type = TDXParams.KLINE_TYPE_5MIN
         today_datetime = (today.year * 10000 + today.month * 100 + today.day) * 10000 + 1500
     else:
         return (0, True, Datetime(last_datetime))
@@ -452,90 +445,91 @@ async def import_tdx_single_block_data(connect, td: TdxData, h5file, market, kty
         need_check = True
         last_krecord = table[-1]
 
+    # 按日期窗口分页：把 [start_date, end_date] 切成 (n+1) 个窗口，从最新向最早逐批请求
+    end_date = convert2_datetime(str(today_datetime), format_label)
+    start_date = convert2_datetime(str(last_datetime), format_label)
+
     add_record_count = 0
     k_period_type: KlinePeriod = common_convert_ktype(ktype)
     row = table.row
-    while n >= 0:
-        # todo 这里start end 有问题
-        bar_list = await td.get_bars(code, period = k_period_type, 
-                                 count=step,
-                                 start=n * 800
-                                )
-        n -= 1
-        if bar_list is None:
-            # print(code, "invalid!!")
+
+    bar_list = await td.get_bars(code, period=k_period_type,
+                                 start_date=start_date,
+                                 end_date=end_date)
+
+    for bar in bar_list:
+        try:
+            if ktype == "DAY":
+                tmp = datetime.date(bar.year, bar.month, bar.day)
+                bar_datetime = (tmp.year * 10000 + tmp.month * 100 + tmp.day) * 10000
+            else:
+                tmp = datetime.datetime(bar.year, bar.month, bar.day, bar.hour, bar.minute)
+                bar_datetime = (tmp.year * 10000 + tmp.month * 100 + tmp.day) * \
+                    10000 + bar.hour * 100 + bar.minute
+        except Exception as e:
+            hku_error("Failed translate datetime: {}! {}".format(bar, e))
             continue
 
-        for bar in bar_list:
+        if need_check and bar_datetime == last_datetime:
+            # print(f'{bar_datetime} {ktype} {market}{code}')
+            if abs(last_krecord['openPrice']*0.001 - bar.open) / (last_krecord['openPrice']*0.001) > 0.02:
+                hku_error(
+                    f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord open: {last_krecord['openPrice']*0.001}, bar: {bar.open}")
+                return (0, False, Datetime(last_datetime))
+            if abs(last_krecord['highPrice']*0.001 - bar.high) / (last_krecord['highPrice']*0.001) > 0.02:
+                hku_error(
+                    f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord high: {last_krecord['highPrice']*0.001}, bar: {bar.high}")
+                return (0, False, Datetime(last_datetime))
+            if abs(last_krecord['lowPrice']*0.001 - bar.low) / (last_krecord['lowPrice']*0.001) > 0.02:
+                hku_error(
+                    f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord low: {last_krecord['lowPrice']*0.001}, bar: {bar.low}")
+                return (0, False, Datetime(last_datetime))
+            if abs(last_krecord['closePrice']*0.001 - bar.close) / (last_krecord['closePrice']*0.001) > 0.02:
+                hku_error(
+                    f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord close: {last_krecord['closePrice']*0.001}, bar: {bar.close}")
+                return (0, False, Datetime(last_datetime))
+            if ktype == 'DAY' and last_krecord['transAmount'] != 0:
+                # 成交额检查：根据数值大小分档次进行相对百分比比较
+                amount_diff_ratio = abs(float(last_krecord['transAmount']) -
+                                        round(bar.amount*0.001)) / float(last_krecord['transAmount'])
+                amount_threshold = 0.5 if float(last_krecord['transAmount']) >= 1e8 else (
+                    0.8 if float(last_krecord['transAmount']) >= 1e6 else 1.0)
+                if amount_diff_ratio > amount_threshold:
+                    hku_error(
+                        f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord amount: {float(last_krecord['transAmount'])}, bar: {round(bar.amount*0.001)}, diff_ratio: {amount_diff_ratio:.4f}")
+                    return (0, False, Datetime(last_datetime))
+            if ktype == 'DAY' and last_krecord['transCount'] != 0:
+                # 成交量检查：根据数值大小分档次进行相对百分比比较
+                vol_diff_ratio = abs(float(last_krecord['transCount']) -
+                                     bar.vol) / float(last_krecord['transCount'])
+                vol_threshold = 0.5 if float(last_krecord['transCount']) >= 1e7 else (
+                    0.8 if float(last_krecord['transCount']) >= 1e5 else 1.0)
+                if vol_diff_ratio > vol_threshold:
+                    hku_error(
+                        f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord count: {last_krecord['transCount']}, bar: {bar.vol}, diff_ratio: {vol_diff_ratio:.4f}")
+                    return (0, False, Datetime(last_datetime))
+            continue
+        # 未收盘之前, 不进行当日或当前时间处理
+        if bar_datetime == today_datetime and datetime.datetime.now().time() < datetime.time(16, 0):
+            continue
+
+        if (today_datetime >= bar_datetime > last_datetime
+                and bar.high >= bar.open >= bar.low > 0
+                and bar.high >= bar.close >= bar.low > 0
+                and int(bar.vol) >= 0 and int(bar.amount*0.001) >= 0):
             try:
-                if ktype == "DAY":
-                    tmp = datetime.date(bar.year, bar.month, bar.day)
-                    bar_datetime = (tmp.year * 10000 + tmp.month * 100 + tmp.day) * 10000
-                else:
-                    tmp = datetime.datetime(bar.year, bar.month, bar.day, bar.hour, bar.minute)
-                    bar_datetime = (tmp.year * 10000 + tmp.month * 100 + tmp.day) * \
-                        10000 + bar.hour * 100 + bar.minute
+                row['datetime'] = bar_datetime
+                row['openPrice'] = bar.open * 1000
+                row['highPrice'] = bar.high * 1000
+                row['lowPrice'] = bar.low * 1000
+                row['closePrice'] = bar.close * 1000
+                row['transAmount'] = round(bar.amount * 0.001)
+                row['transCount'] = round(bar.vol)
+                row.append()
+                add_record_count += 1
             except Exception as e:
-                hku_error("Failed translate datetime: {}, from {}! {}".format(bar, api.ip, e))
-                continue
-
-            if need_check and bar_datetime == last_datetime:
-                # print(f'{bar_datetime} {ktype} {market}{code}')
-                if abs(last_krecord['openPrice']*0.001 - bar.open) / (last_krecord['openPrice']*0.001) > 0.02:
-                    hku_error(
-                        f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord open: {last_krecord['openPrice']*0.001}, bar: {bar.open}")
-                    return (0, False, Datetime(last_datetime))
-                if abs(last_krecord['highPrice']*0.001 - bar.high) / (last_krecord['highPrice']*0.001) > 0.02:
-                    hku_error(
-                        f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord high: {last_krecord['highPrice']*0.001}, bar: {bar.high}")
-                    return (0, False, Datetime(last_datetime))
-                if abs(last_krecord['lowPrice']*0.001 - bar.low) / (last_krecord['lowPrice']*0.001) > 0.02:
-                    hku_error(
-                        f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord low: {last_krecord['lowPrice']*0.001}, bar: {bar.low}")
-                    return (0, False, Datetime(last_datetime))
-                if abs(last_krecord['closePrice']*0.001 - bar.close) / (last_krecord['closePrice']*0.001) > 0.02:
-                    hku_error(
-                        f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord close: {last_krecord['closePrice']*0.001}, bar: {bar.close}")
-                    return (0, False, Datetime(last_datetime))
-                if ktype == 'DAY' and last_krecord['transAmount'] != 0:
-                    # 成交额检查：根据数值大小分档次进行相对百分比比较
-                    amount_diff_ratio = abs(float(last_krecord['transAmount']) -
-                                            round(bar.amount*0.001)) / float(last_krecord['transAmount'])
-                    amount_threshold = 0.5 if float(last_krecord['transAmount']) >= 1e8 else (
-                        0.8 if float(last_krecord['transAmount']) >= 1e6 else 1.0)
-                    if amount_diff_ratio > amount_threshold:
-                        hku_error(
-                            f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord amount: {float(last_krecord['transAmount'])}, bar: {round(bar.amount*0.001)}, diff_ratio: {amount_diff_ratio:.4f}")
-                        return (0, False, Datetime(last_datetime))
-                if ktype == 'DAY' and last_krecord['transCount'] != 0:
-                    # 成交量检查：根据数值大小分档次进行相对百分比比较
-                    vol_diff_ratio = abs(float(last_krecord['transCount']) -
-                                         bar.vol) / float(last_krecord['transCount'])
-                    vol_threshold = 0.5 if float(last_krecord['transCount']) >= 1e7 else (
-                        0.8 if float(last_krecord['transCount']) >= 1e5 else 1.0)
-                    if vol_diff_ratio > vol_threshold:
-                        hku_error(
-                            f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord count: {last_krecord['transCount']}, bar: {bar.vol}, diff_ratio: {vol_diff_ratio:.4f}")
-                        return (0, False, Datetime(last_datetime))
-                continue
-
-            if (today_datetime >= bar_datetime > last_datetime
-                    and bar.high >= bar.open >= bar.low > 0
-                    and bar.high >= bar.close >= bar.low > 0
-                    and int(bar.vol) >= 0 and int(bar.amount*0.001) >= 0):
-                try:
-                    row['datetime'] = bar_datetime
-                    row['openPrice'] = bar.open * 1000
-                    row['highPrice'] = bar.high * 1000
-                    row['lowPrice'] = bar.low * 1000
-                    row['closePrice'] = bar.close * 1000
-                    row['transAmount'] = round(bar.amount * 0.001)
-                    row['transCount'] = round(bar.vol)
-                    row.append()
-                    add_record_count += 1
-                except Exception as e:
-                    hku_error("Can't trans record: {}! {}".format(bar, e))
-                last_datetime = bar_datetime
+                hku_error("Can't trans record: {}! {}".format(bar, e))
+            last_datetime = bar_datetime
 
     if add_record_count > 0:
         table.flush()
@@ -571,15 +565,13 @@ async def batch_fetch_tdx_data(connect, stocks: list, ktype, h5file, startDate):
         for stock in stocks:
             try:
                 this_count, success, lastdate = await import_tdx_single_block_data(connect, td, h5file, market, ktype, stock, startDate)
-                add_record_count += this_count
                 if this_count > 0:
                     if ktype == 'DAY':
                         update_hdf5_extern_data(h5file, market.upper() + stock[2], 'DAY')
                     elif ktype == '5MIN':
                         update_hdf5_extern_data(h5file, market.upper() + stock[2], '5MIN')
             except Exception as e:
-                hku_error("使用 PyTdxData 导入板块{}k线失败: {}{}:{}".format(ktype, market, code, e))
-
+                hku_error("使用 PyTdxData 导入板块{}k线失败: {}{}:{}".format(ktype, market, stock[2], e))
 
 @hku_catch(ret=None)
 def get_hdf5_importer(market, ktype):
@@ -980,38 +972,32 @@ def import_time(connect, market, quotations, api, dest_dir, max_days=9000, progr
 #     print("%.2fm" % ((endtime - starttime) / 60))
 
 
-if __name__ == "__main__":
-    import os
-    import time
-    starttime = time.time()
+def test_stock_import():
+    dest_dir = "/Users/Zhuanz1/data/hikyuu_stock"
+    # temp_dir = "/Users/Zhuanz1/data/temp_stock"
+    connect = sqlite3.connect(dest_dir + "/stock.db")
+    import_index_name(connect)
 
+
+def test_kline_import():
     dest_dir = "/Users/Zhuanz1/data/hikyuu_stock"
     temp_dir = "/Users/Zhuanz1/data/temp_stock"
     connect = sqlite3.connect(dest_dir + "/stock.db")
-    # import_index_name(connect)
-    quotations = ['stock', 'fund']
 
-    from pytdx.hq import TdxHq_API, TDXParams
-    api = TdxHq_API()
     # add_count = import_data(connect, 'SH', 'DAY', quotations, api, dest_dir, progress=ProgressBar)
     code = '880971'
     market = 'SH'
 
     h5file = open_h5file(temp_dir, market, 'DAY')
 
-    table = get_h5table(h5file, market, code)
-
-    last_datetime = int(table[-1]['datetime']) if table.nrows > 0 else 202501011500
-
     # stockid, marketid, code, valid, stktype = stock_record[0], stock_record[1], stock_record[2], stock_record[3], \
     #     stock_record[4]
-    n, step = guess_day_n_step(last_datetime)
-    stock = [8494,1,code,1,2,]
+    stock = [8494, 1, code, 1, 2,]
+
     async def temp_func(connect, h5file, market, ktype, stock, startDate=199012191500):
         async with TdxData() as td:
             try:
                 this_count, success, lastdate = await import_tdx_single_block_data(connect, td, h5file, market, ktype, stock, startDate)
-                add_record_count += this_count
                 if this_count > 0:
                     if ktype == 'DAY':
                         update_hdf5_extern_data(h5file, market.upper() + stock[2], 'DAY')
@@ -1019,8 +1005,14 @@ if __name__ == "__main__":
                         update_hdf5_extern_data(h5file, market.upper() + stock[2], '5MIN')
             except Exception as e:
                 hku_error("使用 PyTdxData 导入板块{}k线失败: {}{}:{}".format(ktype, market, code, e))
-
+                raise e
     asyncio.run(temp_func(connect, h5file, market, 'DAY', stock,))
     # bars = api.get_index_bars(TDXParams.KLINE_TYPE_DAILY, 1, code, n * 800, step)
     # sec_bars = api.get_security_bars(TDXParams.KLINE_TYPE_DAILY, 1, code, n * 800, step)
     # print(bars)
+
+
+if __name__ == "__main__":
+    # test_kline_import()
+    # test_stock_import()
+    pass

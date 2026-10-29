@@ -33,8 +33,8 @@ async def main() -> None:
         # style_boards =await td.get_boards(kind='style')
 
         # board_members = await td.get_board_members('880465')
-        bars =  await td.get_bars("880471", count=10, start_date=convert2_datetime("20261027"),
-                                  end_date=convert2_datetime("20261027"))
+        bars =  await td.get_bars("880471", count=10, start_date=convert2_datetime("20260101"),
+                                  )
         # 成交额 亿
         
         amounty = bars[0].amount / (10000*10000)
