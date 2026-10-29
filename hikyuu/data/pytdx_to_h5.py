@@ -428,7 +428,7 @@ async def import_tdx_single_block_data(connect, td: TdxData, h5file, market, kty
     today = datetime.date.today()
     format_label = "%Y%m%d%H%M"
     if ktype == 'DAY':
-        today_datetime = (today.year * 10000 + today.month * 100 + today.day) * 10000
+        today_datetime = (today.year * 10000 + today.month * 100 + today.day) * 10000 + 1500
     elif ktype == '1MIN':
         today_datetime = (today.year * 10000 + today.month * 100 + today.day) * 10000 + 1500
     elif ktype == '5MIN':
@@ -511,6 +511,7 @@ async def import_tdx_single_block_data(connect, td: TdxData, h5file, market, kty
             continue
         # 未收盘之前, 不进行当日或当前时间处理
         if bar_datetime == today_datetime and datetime.datetime.now().time() < datetime.time(16, 0):
+            hku_info(f"跳过当日:{code[2]}")
             continue
 
         if (today_datetime >= bar_datetime > last_datetime
@@ -986,7 +987,7 @@ def test_kline_import():
     connect = sqlite3.connect(dest_dir + "/stock.db")
 
     # add_count = import_data(connect, 'SH', 'DAY', quotations, api, dest_dir, progress=ProgressBar)
-    code = '880971'
+    code = '880439'
     market = 'SH'
 
     h5file = open_h5file(temp_dir, market, 'DAY')
@@ -1014,6 +1015,6 @@ def test_kline_import():
 
 
 if __name__ == "__main__":
-    # test_kline_import()
+    test_kline_import()
     # test_stock_import()
     pass
