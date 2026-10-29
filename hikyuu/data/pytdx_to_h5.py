@@ -498,16 +498,6 @@ async def import_tdx_single_block_data(connect, td: TdxData, h5file, market, kty
                     hku_error(
                         f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord amount: {float(last_krecord['transAmount'])}, bar: {round(bar.amount*0.001)}, diff_ratio: {amount_diff_ratio:.4f}")
                     return (0, False, Datetime(last_datetime))
-            if ktype == 'DAY' and last_krecord['transCount'] != 0:
-                # 成交量检查：根据数值大小分档次进行相对百分比比较
-                vol_diff_ratio = abs(float(last_krecord['transCount']) -
-                                     bar.vol) / float(last_krecord['transCount'])
-                vol_threshold = 0.5 if float(last_krecord['transCount']) >= 1e7 else (
-                    0.8 if float(last_krecord['transCount']) >= 1e5 else 1.0)
-                if vol_diff_ratio > vol_threshold:
-                    hku_error(
-                        f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord count: {last_krecord['transCount']}, bar: {bar.vol}, diff_ratio: {vol_diff_ratio:.4f}")
-                    return (0, False, Datetime(last_datetime))
             continue
         # 未收盘之前, 不进行当日或当前时间处理
         if bar_datetime == today_datetime and datetime.datetime.now().time() < datetime.time(16, 0):

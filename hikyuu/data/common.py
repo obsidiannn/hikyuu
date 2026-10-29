@@ -65,6 +65,7 @@ class STOCKTYPE:
 
 def get_a_stktype_list():
     """获取A股市场证券类型元组，含B股"""
+    # return (STOCKTYPE.INDEX, STOCKTYPE.BLOCK)
     return (STOCKTYPE.A, STOCKTYPE.INDEX, STOCKTYPE.B, STOCKTYPE.GEM, STOCKTYPE.START, STOCKTYPE.A_BJ, STOCKTYPE.BLOCK)
 
 
@@ -304,6 +305,7 @@ def common_convert_ktype(ktype: str) -> KlinePeriod:
         'MIN': KlinePeriod.MIN_1,
         'MIN3': KlinePeriod.MIN_3,
         'MIN5': KlinePeriod.MIN_5,
+        '5MIN': KlinePeriod.MIN_5,
         'MIN15': KlinePeriod.MIN_15,
         'MIN30': KlinePeriod.MIN_30,
         'MIN60': KlinePeriod.MIN_60,
