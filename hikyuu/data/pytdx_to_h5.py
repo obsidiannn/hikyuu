@@ -562,6 +562,7 @@ async def import_tdx_single_block_data(connect, td: TdxData, h5file, market, kty
 
 
 async def batch_fetch_tdx_data(connect, stocks: list, ktype, h5file, startDate):
+    market = 'SH'
     async with TdxData() as td:
         for stock in stocks:
             try:
@@ -1020,10 +1021,10 @@ def test_kline_import():
 if __name__ == "__main__":
     # test_kline_import()
     # test_stock_import()
-    # test_import_data()
+    test_import_data()
 
-    dest_dir = "/Users/Zhuanz1/data/hikyuu_stock"
-    temp_dir = "/Users/Zhuanz1/data/temp_stock"
-    connect = sqlite3.connect(dest_dir + "/stock.db")
-    import_stock_name(connect, None, 'SH', ['stock'])
+    # dest_dir = "/Users/Zhuanz1/data/hikyuu_stock"
+    # temp_dir = "/Users/Zhuanz1/data/temp_stock"
+    # connect = sqlite3.connect(dest_dir + "/stock.db")
+    # import_stock_name(connect, None, 'SH', ['stock'])
     pass
