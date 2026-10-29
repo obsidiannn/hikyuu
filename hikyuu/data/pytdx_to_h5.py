@@ -566,6 +566,7 @@ async def batch_fetch_tdx_data(connect, stocks: list, ktype, h5file, startDate):
             try:
                 this_count, success, lastdate = await import_tdx_single_block_data(connect, td, h5file, market, ktype, stock, startDate)
                 if this_count > 0:
+                    hku_info(f"板块更新k线:{stock[2]}| {this_count}")
                     if ktype == 'DAY':
                         update_hdf5_extern_data(h5file, market.upper() + stock[2], 'DAY')
                     elif ktype == '5MIN':
